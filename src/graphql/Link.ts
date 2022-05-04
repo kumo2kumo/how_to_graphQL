@@ -10,26 +10,13 @@ export const Link = objectType({
   },
 });
 
-let links: NexusGenObjects["Link"][] = [ // an array of Link objects.
-  {
-    id: 1,
-    url: "www.howtographql.com",
-    description: "Fullstack tutorial for GraphQL",
-  },
-  {
-    id: 2,
-    url: "graphql.org",
-    description: "GraphQL official website",
-  },
-];
-
 export const LinkQuery = extendType({
   type: "Query",
   definition(t) {
     t.nonNull.list.nonNull.field("feed", {
       type: "Link",
       resolve(parent, args, context, info) {
-        return links; //returns the links array
+        return context.prisma.link.findMany();
       },
     });
 
@@ -41,7 +28,11 @@ export const LinkQuery = extendType({
 			resolve(parent, args, context, info){
 				// console.log(args) //{ id: 1 }
 				const { id } = args
-				return links.find(element => element.id = id)
+				return context.prisma.findUnique({
+					where: {
+						id: id
+					}
+				})
 			}
 		})
   },
@@ -58,16 +49,14 @@ export const LinkMutation = extendType({
 			},
 			
 			resolve(parent, args, context) {
-				const {description, url} = args;
 		
-				let idCount = links.length + 1
-				const link = {
-					id: idCount,
-					description: description,
-					url: url
-				}
-				links.push(link)
-				return link;
+				const newLink = context.prisma.link.create({
+					data: {
+						description: args.description,
+						url: args.url
+					}
+				}) // return promise
+				return newLink;
 			}
 		});
 
@@ -88,12 +77,15 @@ export const LinkMutation = extendType({
 		t.nonNull.field("deleteLink", {
 			type: "Link",
 			args: {
-				id: nonNull(idArg())
+				id: nonNull(intArg())
 			},
 			resolve(parent, args, context){
-				const link = links.find(element => element.id == args.id)
-				links = links.filter(element => element.id != args.id)
-				return link
+				const deleteLink = context.prisma.link.delete({
+					where: {
+						id: args.id
+					}
+				})
+				return deleteLink;
 			}
 		})
 	}
