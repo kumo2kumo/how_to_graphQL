@@ -1,5 +1,6 @@
+import { Prisma } from "@prisma/client";
 import { TypeNameMetaFieldDef } from "graphql";
-import { extendType, idArg, intArg, nonNull, objectType, stringArg } from "nexus";
+import { arg, enumType, extendType, idArg, inputObjectType, intArg, nonNull, objectType, stringArg, list} from "nexus";
 import { NexusGenObjectNames, NexusGenObjects } from "../../nexus-typegen";
 
 export const Link = objectType({
@@ -17,7 +18,6 @@ export const Link = objectType({
 				}).postedBy(); 
 			}
 		});
-
 		//linkにvoteしているuser
 		t.nonNull.list.nonNull.field("voters", {
 			type: "User",
@@ -28,15 +28,56 @@ export const Link = objectType({
   },
 });
 
+//total amount of links
+export const Feed = objectType({
+	name: "Feed",
+	definition(t){
+		t.nonNull.list.nonNull.field("links", {type: Link});
+		t.nonNull.int("count")
+		t.id("id");
+	}
+})
+
 export const LinkQuery = extendType({
   type: "Query",
   definition(t) {
-    t.nonNull.list.nonNull.field("feed", {
-      type: "Link",
-      resolve(parent, args, context, info) {
-        return context.prisma.link.findMany();
-      },
-    });
+    t.nonNull.field("feed", {  // 1
+			type: "Feed",
+			args: {
+					filter: stringArg(),
+					skip: intArg(),
+					take: intArg(),
+					orderBy: arg({ type: list(nonNull(LinkOrderByInput)) }), 
+			},
+			async resolve(parent, args, context) {  
+					const where = args.filter
+							? {
+										OR: [
+												{ description: { contains: args.filter } },
+												{ url: { contains: args.filter } },
+										],
+								}
+							: {};
+
+					const links = await context.prisma.link.findMany({  
+							where,
+							skip: args?.skip as number | undefined,
+							take: args?.take as number | undefined,
+							orderBy: args?.orderBy as
+									| Prisma.Enumerable<Prisma.LinkOrderByWithRelationInput>
+									| undefined,
+					});
+
+					const count = await context.prisma.link.count({ where });  // 2
+					const id = `main-feed:${JSON.stringify(args)}`;  // ex. "main-feed:{\"take\":1}"
+						
+					return {  // 4
+							links,
+							count,
+							id,
+					};
+			},
+	});
 
 		t.field("link", {
 			type: "Link",
@@ -114,4 +155,18 @@ export const LinkMutation = extendType({
 		});
 		
 	}
+})
+
+export const LinkOrderByInput = inputObjectType({
+	name: "LinkOrderByInput",
+	definition(t){
+		t.field("description", {type: Sort});
+		t.field("url", {type: Sort} );
+		t.field("createdAt", {type: Sort} );
+	},
+});
+
+export const Sort = enumType({
+	name: "Sort",
+	members: ["asc", "desc"]
 })
