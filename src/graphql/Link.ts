@@ -1,3 +1,4 @@
+import { TypeNameMetaFieldDef } from "graphql";
 import { extendType, idArg, intArg, nonNull, objectType, stringArg } from "nexus";
 import { NexusGenObjectNames, NexusGenObjects } from "../../nexus-typegen";
 
@@ -7,12 +8,21 @@ export const Link = objectType({
     t.nonNull.int("id");
     t.nonNull.string("description");
     t.nonNull.string("url");
+		t.nonNull.dateTime("createdAt")
 		t.field("postedBy", {
 			type: "User",
 			resolve(parent, args, context) {
 				return context.prisma.link.findUnique({
 					where: { id: parent.id }
-				}).postedBy();
+				}).postedBy(); 
+			}
+		});
+
+		//linkにvoteしているuser
+		t.nonNull.list.nonNull.field("voters", {
+			type: "User",
+			resolve(parent, args, context){
+				return context.prisma.link.findUnique({where: { id: parent.id }}).voters() //schema.prismaのfield名
 			}
 		})
   },
@@ -101,6 +111,7 @@ export const LinkMutation = extendType({
 				})
 				return deleteLink;
 			}
-		})
+		});
+		
 	}
 })
